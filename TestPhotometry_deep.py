@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+# In[1]:
 
 
 #! /usr/bin/env python
@@ -25,32 +25,112 @@ import h5py as h
 from astropy.table import Table,join
 
 
-# In[4]:
+# In[2]:
 
 
+#READ IN DEEP CATALOGUE
 #read in Erin's catalogue
-cosmosfile='/global/homes/a/aamon/DES/DEStests/DEEP/MOFcats/SN-C3/run-vd03-SN-C3_C01_r3688p01.fits'
-cosmosfile='/global/project/projectdirs/des/y3-image-sims/deep_data/run-d02-SN-C3_all_r3688p01.fits' #c3grizonly
-data = fits.open(cosmosfile) 
+file='/global/cscratch1/sd/aamon/DEEP/MOFcats/SN-C3/run-vd03-SN-C3_C01_r3688p01.fits' #c3 9band
+#file='/global/project/projectdirs/des/y3-image-sims/deep_data/run-d02-SN-C3_all_r3688p01.fits' #c3grizonly
+#file='/global/cscratch1/sd/aamon/DEEP/MOFcats/SN-C3/run-d03-SN-C3_ebv_extcorr.fits' #c3grizonlydered
+data = fits.open(file) 
 data.info() 
 print(data.info)
 deep=Table(data[1].data)
-print(min(deep['ra']),max(deep['ra']))
-
 cols = data[1].columns
 print(cols)
 
-print(deep['bdf_mag'][:,2]) #u gri z YJHKs
+#allmofs = []
+#for i in np.arange(62):
+#    fname = "/global/homes/a/aamon/DES/DEStests/DEEP/MOFcats/SN-C3/d03/run-d03-SN-C3_C{:02d}_r3688p01.fits".format(i+1) #c3 griz only- updated blending
+#    try:
+#        allmofs.append(fitsio.read(fname))
+#    except:
+#        pass
+#deep = np.hstack(allmofs)
+#print(deep.dtype)
+
+print(min(deep['ra']),max(deep['ra']))
+
+#deep=Table(allmofs)
+#cols = allmofs[1].columns
+
+
+# In[3]:
+
+
+#READ IN GOLD
+catname = '/global/cscratch1/sd/troxel/cats_des_y3/Y3_mastercat_v2_6_20_18.h5'
+
+f = h.File(catname,'r')
+print(f['catalog'].keys())
+print(f['catalog/gold'].keys())
+print(f['catalog/gold/coadd_object_id'])
+
+#FLAGS_GOLD  If you are using SExtractor quantities, you should add (FLAGS_GOLD & 1111000) = 0; and (FLAGS_BADREGIONS & 01) = 0
+#gflag = np.array(f['catalog/gold/flags_gold'])
+#print(gflag)
+
+ra = np.array(f['catalog/gold/ra'])#[star_mask] 
+dec = np.array(f['catalog/gold/dec'])#[star_mask]
+print(len(ra))
+
+zeropt=30
+g = zeropt- 2.5*np.log10(np.array(f['catalog/gold/sof_cm_flux_corrected_g']))#[star_mask]
+r = zeropt- 2.5*np.log10(np.array(f['catalog/gold/sof_cm_flux_corrected_r']))#[star_mask]
+i = zeropt- 2.5*np.log10(np.array(f['catalog/gold/sof_cm_flux_corrected_i']))#[star_mask]
+z = zeropt- 2.5*np.log10(np.array(f['catalog/gold/sof_cm_flux_corrected_z']))#[star_mask]
+
+"""cosmosonly=np.where(  (ra<max(deep['ra'])) & (ra>min(deep['ra']))
+               &  (dec<max(deep['dec'])) & (dec>min(deep['dec']))   )
+i=i[cosmosonly]
+z=z[cosmosonly]
+r=r[cosmosonly]
+print(len(r))"""
+
+"""
+ra=ra[np.where((i<30) & (i>0))]
+dec=dec[np.where((i<30)& (i>0))]
+z=z[np.where((i<30)& (i>0))]
+r=r[np.where((i<30)& (i>0))]
+i=i[np.where((i<30)& (i>0))]
+g=g[np.where((i<30)& (i>0))]
+print(len(ra))
+"""
+ra[ra > 180] -= 360
+
+gold=np.column_stack((ra,dec,g,r,i,z))
+print(len(gold))
+goldra=gold[:,0]
+golddec=gold[:,1]
+goldg=gold[:,2]
+goldr=gold[:,3]
+goldi=gold[:,4]
+goldz=gold[:,5]
+
+
+# In[5]:
+
+
+#print(deep['bdf_mag_dered'][:,2]) #u gri z YJHKs
+print(deep['bdf_mag'][:,2]) 
 #print(len(deep['mag_auto']))
 
 #ASSUMING MAGS ARE UGRI Z YJHKS
 deepra=deep['ra']
 deepdec=deep['dec']
 #deepu=deep['bdf_mag'][:,0]
-deepg=deep['bdf_mag'][:,0]
-deepr=deep['bdf_mag'][:,1]
-deepi=deep['bdf_mag'][:,2]
-deepz=deep['bdf_mag'][:,3]
+#deepg=deep['bdf_mag_dered'][:,0]
+#deepr=deep['bdf_mag_dered'][:,1]
+#deepi=deep['bdf_mag_dered'][:,2]
+#deepz=deep['bdf_mag_dered'][:,3]
+
+#for 9band- not dered
+deepg=deep['bdf_mag'][:,1]
+deepr=deep['bdf_mag'][:,2]
+deepi=deep['bdf_mag'][:,3]
+deepz=deep['bdf_mag'][:,4]
+
 
 #SCALE CUTS
 deepra=deepra[deepr>0]
@@ -92,90 +172,10 @@ deepu=deepu[deepu>0]"""
 print(len(deepra))
 
 #print(deep['id'])
-#print(deep['ra'])
+#print(deep['ra']
 
 
-# In[6]:
-
-
-#colour-colour
-plt.scatter(deepr-deepi,deepg-deepr, marker='.') #,markersize=10 )
-plt.xlabel('r-i')
-plt.ylabel('g-r')
-
-
-# In[5]:
-
-
-#read in gold 
-catname = '/global/cscratch1/sd/troxel/cats_des_y3/Y3_mastercat_v2_6_20_18.h5'
-
-f = h.File(catname,'r')
-print(f['catalog'].keys())
-print(f['catalog/gold'].keys())
-print(f['catalog/gold/coadd_object_id'])
-
-#FLAGS_GOLD  If you are using SExtractor quantities, you should add (FLAGS_GOLD & 1111000) = 0; and (FLAGS_BADREGIONS & 01) = 0
-
-#gflag = np.array(f['catalog/gold/flags_gold'])
-#print(gflag)
-
-ra = np.array(f['catalog/gold/ra'])#[star_mask] 
-dec = np.array(f['catalog/gold/dec'])#[star_mask]
-print(len(ra))
-
-"""#cosmos only
-ra=ra[(ra<53)] # & (ra>49)]
-#dec=dec[cosmosonly]
-print(len(ra))
-ra=ra[(ra>51)]
-print(len(ra))"""
-
-zeropt=30
-g = zeropt- 2.5*np.log10(np.array(f['catalog/gold/sof_cm_flux_corrected_g']))#[star_mask]
-r = zeropt- 2.5*np.log10(np.array(f['catalog/gold/sof_cm_flux_corrected_r']))#[star_mask]
-i = zeropt- 2.5*np.log10(np.array(f['catalog/gold/sof_cm_flux_corrected_i']))#[star_mask]
-z = zeropt- 2.5*np.log10(np.array(f['catalog/gold/sof_cm_flux_corrected_z']))#[star_mask]
-
-print(len(r))
-
-"""cosmosonly=np.where(  (ra<max(deep['ra'])) & (ra>min(deep['ra']))
-               &  (dec<max(deep['dec'])) & (dec>min(deep['dec']))   )
-i=i[cosmosonly]
-z=z[cosmosonly]
-r=r[cosmosonly]
-print(len(r))"""
-print(min(ra)) 
-print(max(ra))
-"""
-ra=ra[np.where((i<30) & (i>0))]
-dec=dec[np.where((i<30)& (i>0))]
-z=z[np.where((i<30)& (i>0))]
-r=r[np.where((i<30)& (i>0))]
-i=i[np.where((i<30)& (i>0))]
-g=g[np.where((i<30)& (i>0))]
-print(len(ra))
-"""
-ra[ra > 180] -= 360
-
-gold=np.column_stack((ra,dec,g,r,i,z))
-print(gold)
-#gold = gold[gold[:,0].argsort()][:1000000]
-
-#gold=gold[np.where(ra>min(deep['ra']))]
-#,max(deep['ra'])
-
-print(gold)
-print(len(gold))
-goldra=gold[:,0]
-golddec=gold[:,1]
-goldr=gold[:,2]
-goldi=gold[:,3]
-goldz=gold[:,4]
-goldg=gold[:,4]
-
-
-# In[7]:
+# In[ ]:
 
 
 #match galaxies by ra and dec
@@ -190,7 +190,7 @@ idx, d2d, d3d = catalog.match_to_catalog_sky(goldcat, nthneighbor=1)
 print(goldra[idx])
 
 
-# In[8]:
+# In[ ]:
 
 
 print(len(goldra)) 
@@ -206,12 +206,6 @@ print(deepra[d2d.arcsecond < 10])
 # In[ ]:
 
 
-
-
-
-# In[9]:
-
-
 matchlim=1
 plt.scatter(deepra[np.where(d2d.arcsecond < matchlim)]-goldra[idx][np.where(d2d.arcsecond < matchlim)],deepra[np.where(d2d.arcsecond < matchlim)], marker='.')
 plt.xlabel('DEEP RA-GOLD RA')
@@ -224,11 +218,8 @@ print(min(goldra[idx]),max(goldra[idx]) )
 print(min(deepra),max(deepra))
 
 
-# In[12]:
+# In[ ]:
 
-
-#GB: take the median mag difference of objects with 0.5*(gold+deep) < 22
-#We don’t want selection or noise biases to bias the measurement of this offset, so we want to restrict to mags where both catalogs are complete.
 
 match=np.column_stack((goldg[idx][np.where(d2d.arcsecond < matchlim)], deepg[np.where(d2d.arcsecond < matchlim)],  
                        goldr[idx][np.where(d2d.arcsecond < matchlim)], deepr[np.where(d2d.arcsecond < matchlim)], 
@@ -236,6 +227,7 @@ match=np.column_stack((goldg[idx][np.where(d2d.arcsecond < matchlim)], deepg[np.
                        goldz[idx][np.where(d2d.arcsecond < matchlim)], deepz[np.where(d2d.arcsecond < matchlim)],
                        goldra[idx][np.where(d2d.arcsecond < matchlim)], deepra[np.where(d2d.arcsecond < matchlim)]))
 
+print("percentage matched: ", float(len(deepr[np.where(d2d.arcsecond < matchlim)]))/float(len(deepr))*100.)
 print(np.shape(match))
 #gold deep
 #g 01
@@ -243,6 +235,7 @@ print(np.shape(match))
 #i 45
 #z 67
 
+#CUTS ON MGNITUDES
 #gold < 22) & (deep < 22)  
 maglim=30
 match=match[np.where( (match[:,0] < maglim) & (match[:,1] < maglim) )]
@@ -257,6 +250,10 @@ match=match[np.where( (match[:,6] < maglim) & (match[:,7] < maglim) )]
 print(np.shape(match))
 
 """
+#CUTS ON MAGNITUDE SUMS
+#GB: take the median mag difference of objects with 0.5*(gold+deep) < 22
+#We don’t want selection or noise biases to bias the measurement of this offset, so we want to restrict to mags where both catalogs are complete.
+
 magsumlim=60
 rsum=  match[:,2]+match[:,3]
 print(rsum)
@@ -318,7 +315,7 @@ goldzselect=goldz[idx][np.where(d2d.arcsecond < matchlim)][np.where(zsum < 44)]
 print(len(goldzselect))"""
 
 
-# In[27]:
+# In[ ]:
 
 
 #plot magnitudes
@@ -326,8 +323,6 @@ print(len(goldzselect))"""
 #print(len(deep['bdf_mag'][np.where(d2d.arcsecond < matchlim)]))
 
 
-#3372/14324  #gold matches/all deep ~quarter
-print("percentage matched: ", float(len(deepr[np.where(d2d.arcsecond < matchlim)]))/float(len(deepr))*100.)
 #fit = np.polyfit(goldr[idx][np.where(d2d.arcsecond < matchlim)], deepr[np.where(d2d.arcsecond < matchlim)], 1)
 #fit_fn = np.poly1d(fit) 
 # fit_fn is now a function which takes in x and returns an estimate for y
@@ -337,15 +332,19 @@ print(len(deepr[deepr>0]))
 #x = np.linspace(14, 40, 1000)
 #plt.plot(x,x,color='red')
 
-print(goldrselect)
+print(len(goldrselect))
 print("***")
-print(deeprselect)
-plt.scatter(goldrselect, deeprselect-goldrselect, marker='.', facecolors='lightblue', color='blue',alpha=0.5)
-plt.xlim(14,27)
+print(len(deeprselect))
+
+fig, ax = plt.subplots()
+hb=ax.hexbin(goldrselect, deeprselect-goldrselect,bins='log' )#, marker='.', facecolors='lightblue', color='blue',alpha=0.2)
+plt.xlim(15,23)
 plt.axhline(y=0, color='red')
-#plt.ylim(16,38)
+plt.ylim(-1.5,1.5)
 plt.xlabel('GOLD r')
 plt.ylabel('DEEP r - GOLD r')
+cb = fig.colorbar(hb, ax=ax)
+cb.set_label('log10(N)')
 
 
 # In[ ]:
@@ -359,15 +358,23 @@ plt.ylabel('DEEP r - GOLD r')
 #plt.plot(goldr[idx][np.where(d2d.arcsecond < matchlim)], fit_fn(goldr[idx][np.where(d2d.arcsecond < matchlim)]), '--k')
 #x = np.linspace(14, 40, 1000)
 #plt.plot(x,x,color='red')
-plt.scatter(goldiselect, deepiselect-goldiselect, marker='.', facecolors='lightblue', color='blue',alpha=0.5)
-plt.xlim(14,28)
-#plt.ylim(15,30)
+
+
+
+fig, ax = plt.subplots()
+hb=ax.hexbin(goldiselect, deepiselect-goldiselect, bins='log')#, marker='.', facecolors='lightblue', color='blue',alpha=0.2)
+#plt.scatter(goldiselect, deepiselect-goldiselect, marker='.', facecolors='lightblue', color='blue',alpha=0.2)
 plt.axhline(y=0, color='red')
+plt.xlim(15,23)
+plt.ylim(-1.5,2.5)
+cb = fig.colorbar(hb, ax=ax)
+cb.set_label('log(N)')
+
 plt.xlabel('GOLD i')
 plt.ylabel('DEEP i - GOLD i')
 
 
-# In[15]:
+# In[ ]:
 
 
 plt.hist(deep, 50, range=(15, 30))
@@ -375,20 +382,20 @@ plt.hist(deepiselect, 50, range=(15, 30))
 plt.xlabel('i')
 
 
-# In[49]:
+# In[ ]:
 
 
-plt.hist(deepiselect-goldiselect, 50, range=(-2, 1))
+plt.hist(deepiselect-goldiselect, 50, range=(-0.4, 0.4))
 plt.axvline(x=0, color='red')
 plt.axvline(x=np.median(deepiselect-goldiselect), color='black')
 #plt.hist(deepi[np.where(d2d.arcsecond < matchlim)], 50, range=(15, 30))
 plt.xlabel('delta i')
 
 
-# In[26]:
+# In[ ]:
 
 
-plt.hist(deeprselect-goldrselect, 50, range=(-10, 5))
+plt.hist(deeprselect-goldrselect, 50, range=(-0.4, 0.4))
 plt.axvline(x=0, color='black')
 print(np.median(deeprselect-goldrselect))
 plt.axvline(x=np.median(deeprselect-goldrselect), color='red')
@@ -396,10 +403,24 @@ plt.axvline(x=np.median(deeprselect-goldrselect), color='red')
 plt.xlabel('delta r')
 
 
-# #### colour-colour
+# #colour-colour
 # plt.scatter(deeprselect-deepiselect,deepgselect-deeprselect, marker='.') #,markersize=10 )
 # plt.xlabel('r-i')
 # plt.ylabel('g-r')
+
+# In[ ]:
+
+
+fig, ax = plt.subplots()
+hb=ax.hexbin(deepgselect-deeprselect,deeprselect-deepiselect ,bins='log')#, marker='.', facecolors='lightblue', color='blue',alpha=0.2)
+cb = fig.colorbar(hb, ax=ax)
+cb.set_label('log10(N)')
+#plt.scatter(deepgselect-deeprselect,deeprselect-deepiselect,marker='.', facecolors='blue', color='blue',alpha=0.2)
+plt.xlabel('g-r')
+plt.ylabel('r-i')
+plt.xlim(-1.5,3)
+plt.ylim(-1.5,3)
+
 
 # In[ ]:
 

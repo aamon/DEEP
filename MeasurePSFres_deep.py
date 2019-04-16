@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[17]:
+# In[1]:
 
 
 #Make a catalogue with real and model PSFs + magnitude etc, for PSF testing script
 
 #! /usr/bin/env python
+
+get_ipython().system('jupyter nbconvert --to script MeasurePSFres_deep.ipynb')
 
 from __future__ import print_function
 import os
@@ -36,14 +38,117 @@ import time
 import fitsio
 #import pixmappy
 import pandas
-#import galsim
-#import galsim.des
+import galsim
+import galsim.des
 #import piff
 import ngmix
 import wget
 
 
-# In[14]:
+# In[ ]:
+
+
+def parse_args():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Run PSFEx on a set of exposures')
+
+    # Directory arguments
+    parser.add_argument('--sex_dir', default='/astro/u/mjarvis/bin/',
+                        help='location of sextrator executable')
+    parser.add_argument('--piff_exe', default='/astro/u/mjarvis/.conda/envs/py2.7/bin/piffify',
+                        help='location of piffify executable')
+    parser.add_argument('--findstars_dir', default='/astro/u/mjarvis/bin',
+                        help='location wl executables')
+    parser.add_argument('--work', default='/astro/u/mjarvis/work/y3_piff',
+                        help='location of intermediate outputs')
+    parser.add_argument('--scratch', default='/data/mjarvis/y3_piff',
+                        help='location of intermediate outputs')
+    parser.add_argument('--pixmappy_dir', default='/astro/u/mjarvis/work/y3_piff/astro',
+                        help='location of pixmappy astrometric solutions')
+    parser.add_argument('--tag', default=None,
+                        help='A version tag to add to the directory name')
+
+    # Exposure inputs
+    parser.add_argument('--base_exposures',
+                        default='/astro/u/mjarvis/work/y3_piff/exposures-ccds-Y3A1_COADD.fits',
+                        help='The base file with information about the DES exposures')
+    parser.add_argument('--file', default='',
+                        help='list of exposures (in lieu of separate exps)')
+    parser.add_argument('--exps', default='', nargs='+',
+                        help='list of exposures to run')
+
+    # Configuration files
+    parser.add_argument('--sex_config',
+                        default='/astro/u/mjarvis/rmjarvis/DESWL/psf/y3.sex',
+                        help='sextractor config file')
+    parser.add_argument('--piff_config',
+                        default='/astro/u/mjarvis/rmjarvis/DESWL/psf/piff.yaml',
+                        help='piff config file')
+    parser.add_argument('--findstars_config',
+                        default='/astro/u/mjarvis/rmjarvis/DESWL/psf/y3.config',
+                        help='findstars config file')
+    parser.add_argument('--sex_params',
+                        default='/astro/u/mjarvis/rmjarvis/DESWL/psf/sex.param_piff',
+                        help='sextractor param file')
+    parser.add_argument('--sex_filter',
+                        default='/astro/u/mjarvis/rmjarvis/DESWL/psf/sex.conv',
+                        help='name of sextractor filter file')
+    parser.add_argument('--sex_nnw',
+                        default='/astro/u/mjarvis/rmjarvis/DESWL/psf/sex.nnw',
+                        help='name of sextractor star file')
+    parser.add_argument('--tapebump_file',
+                        default='/astro/u/mjarvis/rmjarvis/DESWL/psf/mask_ccdnum.txt',
+                        help='name of tape bump file')
+    parser.add_argument('--make_symlinks', default=0, type=int,
+                        help='make symlinks in output dir, rather than move files')
+    parser.add_argument('--noweight', default=False, action='store_const', const=True,
+                        help='do not try to use a weight image.')
+
+
+    # Options
+    parser.add_argument('--clear_output', default=0, type=int,
+                        help='should the output directory be cleared before writing new files?')
+    parser.add_argument('--rm_files', default=1, type=int,
+                        help='remove unpacked files after finished')
+    parser.add_argument('--use_existing', default=0, type=int,
+                        help='use previously downloaded files if they exist')
+    parser.add_argument('--blacklist', default=1, type=int,
+                        help='add failed CCDs to the blacklist')
+    parser.add_argument('--run_piff', default=1, type=int,
+                        help='run piff on files')
+    parser.add_argument('--run_sextractor', default=1, type=int,
+                        help='run sextractor to remake input catalog')
+    parser.add_argument('--run_findstars', default=1, type=int,
+                        help='force a run of findstars to get input star catalog')
+    parser.add_argument('--mag_cut', default=-1, type=float,
+                        help='remove the top mags using mag_auto')
+    parser.add_argument('--min_mag', default=-1, type=float,
+                        help='remove stars brighter than this mag')
+    parser.add_argument('--nbright_stars', default=1, type=int,
+                        help='use median of this many brightest stars for min mag')
+    parser.add_argument('--max_mag', default=0, type=float,
+                        help='only use stars brighter than this mag')
+    parser.add_argument('--use_tapebumps', default=1, type=int,
+                        help='avoid stars in or near tape bumps')
+    parser.add_argument('--tapebump_extra', default=2, type=float,
+                        help='How much extra room around tape bumps to exclude stars in units of FWHM')
+    parser.add_argument('--single_ccd', default=0, type=int,
+                        help='Only do the specified ccd (used for debugging)')
+    parser.add_argument('--reserve', default=0, type=float,
+                        help='Reserve some fraction of the good stars for testing')
+    parser.add_argument('--get_psfex', default=False, action='store_const', const=True,
+                        help='Download the PSFEx files along the way')
+    parser.add_argument('--plot_fs', default=False, action='store_const', const=True,
+                        help='Make a size-magnitude plot of the findstars output')
+    parser.add_argument('--use_ngmix', default=False, action='store_const', const=True,
+                        help='Use ngmix rather than hsm for the measurements')
+
+    args = parser.parse_args()
+    return args
+
+
+# In[2]:
 
 
 #read in list of stars made from Sextractor and PSFEx
@@ -66,20 +171,37 @@ print(cols)
     # star_flag: 1 if findstars thought this was a star, 0 otherwise.
 
 
-# In[12]:
+# In[3]:
 
 
-# Download the files we need:
+def wget( url, file):
+    full_file = os.path.join(url,file)
+    if not os.path.isfile(full_file):
+        # Sometimes this fails with an "http protocol error, bad status line".
+        # Maybe from too many requests at once or something.  So we retry up to 5 times.
+        nattempts = 5
+        cmd = 'wget -q --no-check-certificate %s'%(full_file)
+        for attempt in range(1,nattempts+1):
+            if os.path.exists(full_file):
+                break
+    return full_file
 
-image_file = wget('ftp://ftp.star.ucl.ac.uk/whartley/ultraVISTA/UVISTA_J_21_01_16_allpaw_skysub_015_dr3_rc_v5.fits.gz')
-row['root'] = root
-row['image_file'] = image_file
+
+# In[4]:
+
+
+# Download the files we need. These files are 
+#It looks to me that the image file is the full coadd, 
+image_file = wget('ftp://ftp.star.ucl.ac.uk/whartley/ultraVISTA/','UVISTA_J_21_01_16_allpaw_skysub_015_dr3_rc_v5.fits.gz')
+
+#row['root'] = root
+#row['image_file'] = image_file
 
 #usually weight is in image file but in this case, it's a separate file
-weight_file = wget('ftp://ftp.star.ucl.ac.uk/whartley/ultraVISTA/UVISTA_J_21_01_16_allpaw_skysub_015_dr3_rc_v5.weight.fits.gz')
+weight_file = wget('ftp://ftp.star.ucl.ac.uk/whartley/ultraVISTA/','UVISTA_J_21_01_16_allpaw_skysub_015_dr3_rc_v5.weight.fits.gz')
 
 
-# In[ ]:
+# In[5]:
 
 
 #Not sure this is necessary, but having this information might be useful for further tests
@@ -151,13 +273,36 @@ def read_image_header(row, img_file):
     row['hex'] = hex
 
 
-# In[ ]:
+# In[1]:
 
 
+# Make the work directory if it does not exist yet.
+args = parse_args()
+work = os.path.expanduser(args.work)
+try:
+    if not os.path.exists(work):
+        os.makedirs(work)
+except OSError:
+    if not os.path.exists(work): raise
+scratch = os.path.expanduser(args.scratch)
+logger.info('scratch dir = %s',scratch)
+try:
+    if not os.path.exists(scratch):
+        os.makedirs(scratch)
+
+except OSError:
+    if not os.path.exists(scratch): raise
+            
+# A listing Erin made of all the exposures in Y3 used in meds files
+all_exp = fitsio.read(args.base_exposures)
+# Switch to native endians, so pandas doesn't complain.
+all_exp = all_exp.astype(all_exp.dtype.newbyteorder('='))
+            
+row = pandas.DataFrame(info).iloc[0]
 read_image_header(row, image_file)
 
 
-# In[9]:
+# In[ ]:
 
 
 #put the stars data into a dataframe 
@@ -198,13 +343,13 @@ def read_findstars(star_file, img_file):
     return df
 
 
-# In[10]:
+# In[ ]:
 
 
 df= read_findstars(star_file,image_file)
 
 
-# In[31]:
+# In[ ]:
 
 
 #read in psf model file
@@ -309,7 +454,7 @@ def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, fwhm): #, lo
 measure_psfex_shapes(df, psfex_file, image_file, noweight=False, wcs, fwhm) #, logger)   
 
 
-# In[30]:
+# In[ ]:
 
 
 def measure_star_shapes(df, image_file, noweight, wcs, fwhm): #, logger):
