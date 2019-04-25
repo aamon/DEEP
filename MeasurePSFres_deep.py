@@ -45,9 +45,10 @@ import ngmix
 import wget
 
 
-# In[ ]:
+# In[2]:
 
 
+#haven't edited or decided which bits of this cell I need
 def parse_args():
     import argparse
 
@@ -148,7 +149,7 @@ def parse_args():
     return args
 
 
-# In[2]:
+# In[3]:
 
 
 #read in list of stars made from Sextractor and PSFEx
@@ -171,7 +172,7 @@ print(cols)
     # star_flag: 1 if findstars thought this was a star, 0 otherwise.
 
 
-# In[3]:
+# In[4]:
 
 
 def wget( url, file):
@@ -187,7 +188,7 @@ def wget( url, file):
     return full_file
 
 
-# In[4]:
+# In[5]:
 
 
 # Download the files we need. These files are 
@@ -201,7 +202,7 @@ image_file = wget('ftp://ftp.star.ucl.ac.uk/whartley/ultraVISTA/','UVISTA_J_21_0
 weight_file = wget('ftp://ftp.star.ucl.ac.uk/whartley/ultraVISTA/','UVISTA_J_21_01_16_allpaw_skysub_015_dr3_rc_v5.weight.fits.gz')
 
 
-# In[5]:
+# In[6]:
 
 
 #Not sure this is necessary, but having this information might be useful for further tests
@@ -273,10 +274,11 @@ def read_image_header(row, img_file):
     row['hex'] = hex
 
 
-# In[1]:
+# In[7]:
 
 
 # Make the work directory if it does not exist yet.
+#This chunk of code doens't work
 args = parse_args()
 work = os.path.expanduser(args.work)
 try:
@@ -302,7 +304,7 @@ row = pandas.DataFrame(info).iloc[0]
 read_image_header(row, image_file)
 
 
-# In[ ]:
+# In[8]:
 
 
 #put the stars data into a dataframe 
@@ -343,7 +345,7 @@ def read_findstars(star_file, img_file):
     return df
 
 
-# In[ ]:
+# In[9]:
 
 
 df= read_findstars(star_file,image_file)

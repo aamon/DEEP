@@ -30,9 +30,10 @@ from astropy.table import Table,join
 
 #READ IN DEEP CATALOGUE
 #read in Erin's catalogue
-file='/global/cscratch1/sd/aamon/DEEP/MOFcats/SN-C3/run-vd03-SN-C3_C01_r3688p01.fits' #c3 9band
+#file='/global/cscratch1/sd/aamon/DEEP/MOFcats/SN-C3/run-vd03-SN-C3_C01_r3688p01.fits' #c3 9band
 #file='/global/project/projectdirs/des/y3-image-sims/deep_data/run-d02-SN-C3_all_r3688p01.fits' #c3grizonly
-#file='/global/cscratch1/sd/aamon/DEEP/MOFcats/SN-C3/run-d03-SN-C3_ebv_extcorr.fits' #c3grizonlydered
+file='/global/cscratch1/sd/aamon/DEEP/MOFcats/SN-C3/run-d03-SN-C3_ebv_extcorr.fits' #c3grizonlydered
+label="C34band_dered"
 data = fits.open(file) 
 data.info() 
 print(data.info)
@@ -49,11 +50,11 @@ print(cols)
 #        pass
 #deep = np.hstack(allmofs)
 #print(deep.dtype)
-
 print(min(deep['ra']),max(deep['ra']))
-
 #deep=Table(allmofs)
 #cols = allmofs[1].columns
+#MAKE CUTS ON CAT
+#flags=0, bdf_s2n>10, mag_i<24.5, and a rough bright star-galaxy separation (removing bdf_s2n>80 and bdf_T<0 objects
 
 
 # In[3]:
@@ -109,7 +110,7 @@ goldi=gold[:,4]
 goldz=gold[:,5]
 
 
-# In[5]:
+# In[4]:
 
 
 #print(deep['bdf_mag_dered'][:,2]) #u gri z YJHKs
@@ -120,16 +121,16 @@ print(deep['bdf_mag'][:,2])
 deepra=deep['ra']
 deepdec=deep['dec']
 #deepu=deep['bdf_mag'][:,0]
-#deepg=deep['bdf_mag_dered'][:,0]
-#deepr=deep['bdf_mag_dered'][:,1]
-#deepi=deep['bdf_mag_dered'][:,2]
-#deepz=deep['bdf_mag_dered'][:,3]
+deepg=deep['bdf_mag_dered'][:,0]
+deepr=deep['bdf_mag_dered'][:,1]
+deepi=deep['bdf_mag_dered'][:,2]
+deepz=deep['bdf_mag_dered'][:,3]
 
 #for 9band- not dered
-deepg=deep['bdf_mag'][:,1]
-deepr=deep['bdf_mag'][:,2]
-deepi=deep['bdf_mag'][:,3]
-deepz=deep['bdf_mag'][:,4]
+#deepg=deep['bdf_mag'][:,1]
+#deepr=deep['bdf_mag'][:,2]
+#deepi=deep['bdf_mag'][:,3]
+#deepz=deep['bdf_mag'][:,4]
 
 
 #SCALE CUTS
@@ -175,7 +176,7 @@ print(len(deepra))
 #print(deep['ra']
 
 
-# In[ ]:
+# In[5]:
 
 
 #match galaxies by ra and dec
@@ -190,7 +191,7 @@ idx, d2d, d3d = catalog.match_to_catalog_sky(goldcat, nthneighbor=1)
 print(goldra[idx])
 
 
-# In[ ]:
+# In[6]:
 
 
 print(len(goldra)) 
@@ -203,7 +204,7 @@ plt.xlabel('d2d (arcsec)')
 print(deepra[d2d.arcsecond < 10])
 
 
-# In[ ]:
+# In[7]:
 
 
 matchlim=1
@@ -218,7 +219,7 @@ print(min(goldra[idx]),max(goldra[idx]) )
 print(min(deepra),max(deepra))
 
 
-# In[ ]:
+# In[8]:
 
 
 match=np.column_stack((goldg[idx][np.where(d2d.arcsecond < matchlim)], deepg[np.where(d2d.arcsecond < matchlim)],  
@@ -315,7 +316,7 @@ goldzselect=goldz[idx][np.where(d2d.arcsecond < matchlim)][np.where(zsum < 44)]
 print(len(goldzselect))"""
 
 
-# In[ ]:
+# In[9]:
 
 
 #plot magnitudes
@@ -345,9 +346,11 @@ plt.xlabel('GOLD r')
 plt.ylabel('DEEP r - GOLD r')
 cb = fig.colorbar(hb, ax=ax)
 cb.set_label('log10(N)')
+name="Figs/deltar_v_goldr_%s.pdf" % (label)
+plt.savefig(name, format='pdf', dpi=1200)
 
 
-# In[ ]:
+# In[10]:
 
 
 #plot magnitudes
@@ -372,9 +375,11 @@ cb.set_label('log(N)')
 
 plt.xlabel('GOLD i')
 plt.ylabel('DEEP i - GOLD i')
+name="Figs/deltai_v_goldi_%s.pdf" % (label)
+plt.savefig(name, format='pdf', dpi=1200)
 
 
-# In[ ]:
+# In[11]:
 
 
 plt.hist(deep, 50, range=(15, 30))
@@ -390,6 +395,8 @@ plt.axvline(x=0, color='red')
 plt.axvline(x=np.median(deepiselect-goldiselect), color='black')
 #plt.hist(deepi[np.where(d2d.arcsecond < matchlim)], 50, range=(15, 30))
 plt.xlabel('delta i')
+name="Figs/deltai_matched_hist_%s.pdf" % (label)
+plt.savefig(name, format='pdf', dpi=1200)
 
 
 # In[ ]:
@@ -401,6 +408,8 @@ print(np.median(deeprselect-goldrselect))
 plt.axvline(x=np.median(deeprselect-goldrselect), color='red')
 #plt.hist(deepi[np.where(d2d.arcsecond < matchlim)], 50, range=(15, 30))
 plt.xlabel('delta r')
+name="Figs/deltai_matched_hist_%s.pdf" % (label)
+plt.savefig(name, format='pdf', dpi=1200)
 
 
 # #colour-colour
@@ -418,8 +427,12 @@ cb.set_label('log10(N)')
 #plt.scatter(deepgselect-deeprselect,deeprselect-deepiselect,marker='.', facecolors='blue', color='blue',alpha=0.2)
 plt.xlabel('g-r')
 plt.ylabel('r-i')
-plt.xlim(-1.5,3)
-plt.ylim(-1.5,3)
+#plt.xlim(-1.5,3)
+#plt.ylim(-1.5,3)
+plt.xlim(0,2)
+plt.ylim(-0.5,2.0)
+name="Figs/r-i_v_g-r_matched_%s.pdf" % (label)
+plt.savefig(name, format='pdf', dpi=1200)
 
 
 # In[ ]:
