@@ -72,8 +72,10 @@ def read_psfex_stars(star_file, cat_file, magzp, logger):
     source_id = data['SOURCE_NUMBER']
     x_im = data['X_IMAGE']
     y_im = data['Y_IMAGE']
+    fwhm_psf = data['FWHM_PSF']
     df = pandas.DataFrame(data={'SOURCE_NUMBER':source_id, 'X_IMAGE':x_im,
-                          'Y_IMAGE':y_im, 'FLAGS_PSF':flags_psf})
+                          'Y_IMAGE':y_im, 'FLAGS_PSF':flags_psf,
+                                'FWHM_PSF':fwhm_psf})
 
     ntot = len(df)
     nstars = df['FLAGS_PSF'].sum()
@@ -90,6 +92,87 @@ def read_psfex_stars(star_file, cat_file, magzp, logger):
     df['use'] = use  # Just using all of the stars currently
     return df
 
+def make_ngmix_prior(T, pixel_scale):
+    from ngmix import priors, joint_prior
+
+    # centroid is 1 pixel gaussian in each direction
+    cen_prior=priors.CenPrior(0.0, 0.0, pixel_scale, pixel_scale)
+
+    # g is Bernstein & Armstrong prior with sigma = 0.1
+    gprior=priors.GPriorBA(0.1)
+
+    # T is log normal with width 0.2
+    Tprior=priors.LogNormal(T, 0.2)
+
+    # flux is the only uninformative prior
+    Fprior=priors.FlatPrior(-10.0, 1.e10)
+
+    prior=joint_prior.PriorSimpleSep(cen_prior, gprior, Tprior, Fprior)
+    return prior
+
+def ngmix_fit(im, wt, fwhm, x, y, logger):
+    flag = 0
+    dx, dy, g1, g2, flux = 0., 0., 0., 0., 0.
+    T_guess = (fwhm / 2.35482)**2 * 2.
+    T = T_guess
+    #print('fwhm = %s, T_guess = %s'%(fwhm, T_guess))
+    try:
+        #hsm_dx,hsm_dy,hsm_g1,hsm_g2,hsm_T,hsm_flux,hsm_flag = hsm(im, None, logger)
+        #logger.info('hsm: %s, %s, %s, %s, %s, %s, %s',hsm_dx,hsm_dy,hsm_g1,hsm_g2,hsm_T,hsm_flux,hsm_flag)
+        #if hsm_flag != 0:
+            #print('hsm: ',g1,g2,T,flux,hsm_flag)
+            #print('Bad hsm measurement.  Reverting to g=(0,0) and T=T_guess = %s'%(T_guess))
+            #T = T_guess
+        #elif np.abs(np.log(T/T_guess)) > 0.5:
+            #print('hsm: ',g1,g2,T,flux,hsm_flag)
+            #print('T = %s is not near T_guess = %s.  Reverting to T_guess'%(T,T_guess))
+            #T = T_guess
+        if galsim.__version__ >= '1.5.1':
+            wcs = im.wcs.local(im.center)
+        else:
+            wcs = im.wcs.local(im.center())
+
+        prior = make_ngmix_prior(T, wcs.minLinearScale())
+
+        if galsim.__version__ >= '1.5.1':
+            cen = im.true_center - im.origin
+        else:
+            cen = im.trueCenter() - im.origin()
+        jac = ngmix.Jacobian(wcs=wcs, x=cen.x + x - int(x+0.5), y=cen.y + y - int(y+0.5))
+        if wt is None:
+            obs = ngmix.Observation(image=im.array, jacobian=jac)
+        else:
+            obs = ngmix.Observation(image=im.array, weight=wt.array, jacobian=jac)
+
+        lm_pars = {'maxfev':4000}
+        runner=ngmix.bootstrap.PSFRunner(obs, 'gauss', T, lm_pars, prior=prior)
+        runner.go(ntry=3)
+
+        ngmix_flag = runner.fitter.get_result()['flags']
+        gmix = runner.fitter.get_gmix()
+    except Exception as e:
+        logger.info(e)
+        logger.info(' *** Bad measurement (caught exception).  Mask this one.')
+        flag |= BAD_MEASUREMENT
+        return dx,dy,g1,g2,T,flux,flag
+
+    if ngmix_flag != 0:
+        logger.info(' *** Bad measurement (ngmix flag = %d).  Mask this one.',ngmix_flag)
+        flag |= BAD_MEASUREMENT
+
+    dx, dy = gmix.get_cen()
+    if dx**2 + dy**2 > MAX_CENTROID_SHIFT**2:
+        logger.info(' *** Centroid shifted by %f,%f in ngmix.  Mask this one.',dx,dy)
+        flag |= CENTROID_SHIFT
+
+    g1, g2, T = gmix.get_g1g2T()
+    if abs(g1) > 0.5 or abs(g2) > 0.5:
+        logger.info(' *** Bad shape measurement (%f,%f).  Mask this one.',g1,g2)
+        flag |= BAD_MEASUREMENT
+
+    flux = gmix.get_flux() / wcs.pixelArea()  # flux is in ADU.  Should ~ match sum of pixels
+    #logger.info('ngmix: %s %s %s %s %s %s %s',dx,dy,g1,g2,T,flux,flag)
+    return dx, dy, g1, g2, T, flux, flag
 
 def hsm(im, wt, logger):
     #print('im stats: ',im.array.min(),im.array.max(),im.array.mean(),np.median(im.array))
@@ -155,7 +238,7 @@ def hsm(im, wt, logger):
 
     return dx, dy, g1, g2, T, flux, flag
 
-def measure_star_shapes(df, image_file, noweight, wcs, logger):
+def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, logger):
     """Measure shapes of the raw stellar images at each location.
     """
     logger.info('Read in stars in file: %s',image_file)
@@ -181,7 +264,7 @@ def measure_star_shapes(df, image_file, noweight, wcs, logger):
         df.loc[~df['use'], 'obs_flag'] |= NOT_USED
 
     full_image = galsim.fits.read(image_file, hdu=0)
-    #full_image = galsim.fits.read(image_file)
+
     if wcs is not None:
         full_image.wcs = wcs
 
@@ -195,7 +278,7 @@ def measure_star_shapes(df, image_file, noweight, wcs, logger):
     for i in ind:
         x = df['X_IMAGE'].iloc[i]
         y = df['Y_IMAGE'].iloc[i]
-
+        fwhm = df['FWHM_PSF'].iloc[i]
         #print('Measure shape for star at ',x,y)
         b = galsim.BoundsI(int(x)-stamp_size/2, int(x)+stamp_size/2,
                            int(y)-stamp_size/2, int(y)+stamp_size/2)
@@ -207,8 +290,11 @@ def measure_star_shapes(df, image_file, noweight, wcs, logger):
         else:
             wt = full_weight[b]
 
-            
-        dx, dy, e1, e2, T, flux, flag = hsm(im, wt, logger)
+        if use_ngmix:
+            dx, dy, e1, e2, T, flux, flag = ngmix_fit(im, wt, fwhm, x, y, logger)
+        else:
+            dx, dy, e1, e2, T, flux, flag = hsm(im, wt, logger)
+
         #logger.info('ngmix measurement: (%f,%f,%f,%f,%f,%f).',dx,dy,e1,e2,T,flux)
         if np.any(np.isnan([dx,dy,e1,e2,T,flux])):
             logger.info(' *** NaN detected (%f,%f,%f,%f,%f,%f).',dx,dy,e1,e2,T,flux)
@@ -228,7 +314,7 @@ def measure_star_shapes(df, image_file, noweight, wcs, logger):
     # Any stars that weren't measurable here, don't use for PSF fitting.
     df.loc[df['obs_flag']!=0, 'use'] = False
 
-def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, logger):
+def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, use_ngmix, logger):
     """Measure shapes of the PSFEx solution at each location.
     """
     logger.info('Read in PSFEx file: %s',psfex_file)
@@ -273,6 +359,7 @@ def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, logger):
     for i in ind:
         x = df['X_IMAGE'].iloc[i]
         y = df['Y_IMAGE'].iloc[i]
+        fwhm = df['FWHM_PSF'].iloc[i]
         #print('Measure PSFEx model shape at ',x,y)
         image_pos = galsim.PositionD(x,y)
         psf_i = psf.getPSF(image_pos)
@@ -293,7 +380,11 @@ def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, logger):
             var.invertSelf()
             im.addNoise(galsim.VariableGaussianNoise(rng, var))
 
-        dx, dy, e1, e2, T, flux, flag = hsm(im, wt, logger)
+        if use_ngmix:
+            dx, dy, e1, e2, T, flux, flag = ngmix_fit(im, wt, fwhm, x, y, logger)
+        else:
+            dx, dy, e1, e2, T, flux, flag = hsm(im, wt, logger)
+
         if np.any(np.isnan([dx,dy,e1,e2,T,flux])):
             logger.info(' *** NaN detected (%f,%f,%f,%f,%f,%f).',dx,dy,e1,e2,T,flux)
             flag |= BAD_MEASUREMENT
@@ -324,11 +415,14 @@ logger = logging.getLogger('size_residual')
 # Read in some useful values, such as position
 df = read_psfex_stars(sf, cf, magzp, logger)
 # Measure the hsm shapes on the stars in the actual image
+# For ngmix set use_ngmix to True (but for some reason currently
+# all ngmix flags show that there isn't a good fit, so this mode runs
+# but produces nothing usable
 measure_star_shapes(
-    df,im_f,noweight=False,wcs=None,logger=logger)
+    df,im_f,noweight=False,wcs=None,use_ngmix=False,logger=logger)
 # Measure 
 measure_psfex_shapes(
-    df,pf,im_f,noweight=False,wcs=None,logger=logger)
+    df,pf,im_f,noweight=False,wcs=None,use_ngmix=False,logger=logger)
 
 
 # Now plot some results:
@@ -340,6 +434,7 @@ resid_T = psf_t[good]-star_t[good]
 
 # Plotting the distribution of residuals
 plt.hist(resid_T, 30)
+print(resid_T.size)
 plt.xlabel('PSF T - obstar T', fontsize='x-large')
 plt.ylabel('#',fontsize='x-large')
 plt.savefig('UltraVISTA_J_resid.png',bbox_inches='tight')
