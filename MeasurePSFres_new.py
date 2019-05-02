@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+1;95;0c#!/usr/bin/env python
 # coding: utf-8
 
 # In[71]:
@@ -121,7 +121,7 @@ def read_psfex_stars(star_file, cat_file, magzp, logger): #combination of read f
     df['mag_aper'] = sdata['MAG_APER'][:,0]
     df['flux_radius'] = sdata['FLUX_RADIUS']
 
-    df = df[df.FLAGS_PSF == 0]
+    #df = df[df.FLAGS_PSF == 0] #ideally we want this line to measure the shapes of only the good stars, but it makes the code crash TBD figure out why
     print('   found %d good stars', len(df))
     print('   found %d good stars', len(df))
     plt.scatter(sdata['MAG_APER'][:,0], sdata['FLUX_RADIUS'],c='blue',label='FLAGS_PSF==0', marker='.',s=4) # , colormap='viridis')
