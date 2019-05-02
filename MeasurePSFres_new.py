@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[71]:
 
 
 #! /usr/bin/env python                                                                                            
@@ -34,13 +34,14 @@ import ngmix
 from astropy.io import fits
 import wget
 from astropy.wcs import WCS
+from ngmix import priors, joint_prior
 
 import matplotlib
 #matplotlib.use('Agg') # needs to be done before import pyplot                                                    
 import matplotlib.pyplot as plt
 
 
-# In[2]:
+# In[6]:
 
 
 # Don't skip columns in describe output  (default is 20, which is a bit too small)                                
@@ -75,7 +76,7 @@ BLACK_FLAG_FACTOR = 512 # blacklist flags are this times the original exposure b
 # be important)     
 
 
-# In[47]:
+# In[84]:
 
 
 #put the stars data into a dataframe 
@@ -85,10 +86,10 @@ def read_psfex_stars(star_file, cat_file, magzp, logger): #combination of read f
     """
     if not os.path.exists(star_file):
         return None
-
-    dat = fits.open(star_file)
+    print("here")
+    #dat = fits.open(star_file)
     #print(dat[2].columns)
-    dat = fits.open(cat_file)
+    #dat = fits.open(cat_file)
     #print(dat[2].columns)
     
     # Read the output and make a DataFrome with the contents                                                      
@@ -112,7 +113,7 @@ def read_psfex_stars(star_file, cat_file, magzp, logger): #combination of read f
     # Add on some extra information from the sextractor catalog                                                   
     sdata = fitsio.read(cat_file, 2)
     #print(data['X_IMAGE'])
-    #print(sdata['X_IMAGE'])
+    print(sdata['X_IMAGE'])
     assert len(data) == len(sdata)
     #print("magaper")
     #print(sdata['MAG_APER'])
@@ -120,23 +121,24 @@ def read_psfex_stars(star_file, cat_file, magzp, logger): #combination of read f
     df['mag_aper'] = sdata['MAG_APER'][:,0]
     df['flux_radius'] = sdata['FLUX_RADIUS']
 
-    #df = df[df.FLAGS_PSF == 0]
+    df = df[df.FLAGS_PSF == 0]
     print('   found %d good stars', len(df))
     print('   found %d good stars', len(df))
-    plt.scatter(sdata['MAG_APER'][[np.where(data['FLAGS_PSF']!=0)],0], sdata['FLUX_RADIUS'][np.where(data['FLAGS_PSF']!=0)],c='blue',label='FLAGS_PSF!=0', marker='.',s=4) # , colormap='viridis')
+    plt.scatter(sdata['MAG_APER'][:,0], sdata['FLUX_RADIUS'],c='blue',label='FLAGS_PSF==0', marker='.',s=4) # , colormap='viridis')
     plt.scatter(df['mag_aper'], df['flux_radius'], c='red',label='FLAGS_PSF==0', marker='.',s=4) # , colormap='viridis')
     plt.xlim((10,28))
     plt.ylim(0,10)
     #axs2[i].legend(sexstar['FLAGS_PSF'])
     plt.ylabel('FLUX_RADIUS')
     plt.xlabel('MAG_APER')
+    plt.show()
 
     return df
 
 
-# In[29]:
+# In[ ]:
 
-
+"""
 #this is just a dublicate from the end in order to test why my mag_apers for "good" galaxies were higher than expected
 
 # Change locations to yours      
@@ -165,19 +167,15 @@ for band in bands:
     #print(h)
     fwhm = h['PSF_FWHM']
     
-    magzp = 30.0
-    mmlogging_level = logging.INFO
-    logger = logging.getLogger('size_residual')
-    # Read in some useful values, such as position                                                                           
+    magzp = 30.0                                                                  
     df = read_psfex_stars(sf, cf, magzp, logger)
+"""
 
-
-# In[30]:
+# In[82]:
 
 
 def make_ngmix_prior(T, pixel_scale):
-    from ngmix import priors, joint_prior
-
+    
     # centroid is 1 pixel gaussian in each direction
     cen_prior=priors.CenPrior(0.0, 0.0, pixel_scale, pixel_scale)
 
@@ -194,76 +192,88 @@ def make_ngmix_prior(T, pixel_scale):
     return prior
 
 
-def ngmix_fit(im, wt, fwhm, x, y, logger):
+def ngmix_fit(im, wt, fwhm, x, y, logger, psfflag):
+    
+        
     flag = 0
     dx, dy, g1, g2, flux = 0., 0., 0., 0., 0.
     T_guess = (fwhm / 2.35482)**2 * 2.
     T = T_guess
     #print('fwhm = %s, T_guess = %s'%(fwhm, T_guess))
-    try:
-        #hsm_dx,hsm_dy,hsm_g1,hsm_g2,hsm_T,hsm_flux,hsm_flag = hsm(im, None, logger)
-        #logger.info('hsm: %s, %s, %s, %s, %s, %s, %s',hsm_dx,hsm_dy,hsm_g1,hsm_g2,hsm_T,hsm_flux,hsm_flag)
-        #if hsm_flag != 0:
-            #print('hsm: ',g1,g2,T,flux,hsm_flag)
-            #print('Bad hsm measurement.  Reverting to g=(0,0) and T=T_guess = %s'%(T_guess))
-            #T = T_guess
-        #elif np.abs(np.log(T/T_guess)) > 0.5:
-            #print('hsm: ',g1,g2,T,flux,hsm_flag)
-            #print('T = %s is not near T_guess = %s.  Reverting to T_guess'%(T,T_guess))
-            #T = T_guess
-        if galsim.__version__ >= '1.5.1':
+    if psfflag==0:
+        try:
+            #hsm_dx,hsm_dy,hsm_g1,hsm_g2,hsm_T,hsm_flux,hsm_flag = hsm(im, None, logger)
+            #logger.info('hsm: %s, %s, %s, %s, %s, %s, %s',hsm_dx,hsm_dy,hsm_g1,hsm_g2,hsm_T,hsm_flux,hsm_flag)
+            #if hsm_flag != 0:
+                #print('hsm: ',g1,g2,T,flux,hsm_flag)
+                #print('Bad hsm measurement.  Reverting to g=(0,0) and T=T_guess = %s'%(T_guess))
+                #T = T_guess
+            #elif np.abs(np.log(T/T_guess)) > 0.5:
+                #print('hsm: ',g1,g2,T,flux,hsm_flag)
+                #print('T = %s is not near T_guess = %s.  Reverting to T_guess'%(T,T_guess))
+                #T = T_guess
+
+            print(im.wcs.local)
+            print(im.center)
+            print("this line ", im.wcs.local(im.center))
             wcs = im.wcs.local(im.center)
-        else:
-            wcs = im.wcs.local(im.center())
+            print(wcs)
 
-        prior = make_ngmix_prior(T, wcs.minLinearScale())
+            print("going to make prior", T,wcs.minLinearScale())
+            prior = make_ngmix_prior(T, wcs.minLinearScale())
+            print("prior", prior)
 
-        if galsim.__version__ >= '1.5.1':
-            cen = im.true_center - im.origin
-        else:
-            cen = im.trueCenter() - im.origin()
-        jac = ngmix.Jacobian(wcs=wcs, x=cen.x + x - int(x+0.5), y=cen.y + y - int(y+0.5))
-        if wt is None:
-            obs = ngmix.Observation(image=im.array, jacobian=jac)
-        else:
-            obs = ngmix.Observation(image=im.array, weight=wt.array, jacobian=jac)
+            if galsim.__version__ >= '1.5.1':
+                cen = im.true_center - im.origin
+            else:
+                cen = im.trueCenter() - im.origin()
+            jac = ngmix.Jacobian(wcs=wcs, x=cen.x + x - int(x+0.5), y=cen.y + y - int(y+0.5))
+            if wt is None:
+                obs = ngmix.Observation(image=im.array, jacobian=jac)
+            else:
+                obs = ngmix.Observation(image=im.array, weight=wt.array, jacobian=jac)
 
-        lm_pars = {'maxfev':4000}
-        runner=ngmix.bootstrap.PSFRunner(obs, 'gauss', T, lm_pars, prior=prior)
-        runner.go(ntry=3)
+            lm_pars = {'maxfev':4000}
+            runner=ngmix.bootstrap.PSFRunner(obs, 'gauss', T, lm_pars, prior=prior)
+            runner.go(ntry=3)
 
-        ngmix_flag = runner.fitter.get_result()['flags']
-        gmix = runner.fitter.get_gmix()
-    except Exception as e:
-        logger.info(e)
-        logger.info(' *** Bad measurement (caught exception).  Mask this one.')
-        flag |= BAD_MEASUREMENT
-        return dx,dy,g1,g2,T,flux,flag
+            ngmix_flag = runner.fitter.get_result()['flags']
+            gmix = runner.fitter.get_gmix()
+        except Exception as e:
+            logger.info(e)
+            logger.info(' *** Bad measurement (caught exception).  Mask this one.')
+            print(' *** Bad measurement (caught exception).  Mask this one.')
+            flag |= BAD_MEASUREMENT
+            return dx,dy,g1,g2,T,flux,flag
 
-    if ngmix_flag != 0:
-        logger.info(' *** Bad measurement (ngmix flag = %d).  Mask this one.',ngmix_flag)
-        flag |= BAD_MEASUREMENT
+        if ngmix_flag != 0:
+            logger.info(' *** Bad measurement (ngmix flag = %d).  Mask this one.',ngmix_flag)
+            flag |= BAD_MEASUREMENT
+            print(' *** Bad measurement (ngmix flag = %d).  Mask this one.',ngmix_flag)
 
-    dx, dy = gmix.get_cen()
-    if dx**2 + dy**2 > MAX_CENTROID_SHIFT**2:
-        logger.info(' *** Centroid shifted by %f,%f in ngmix.  Mask this one.',dx,dy)
-        flag |= CENTROID_SHIFT
+        dx, dy = gmix.get_cen()
+        if dx**2 + dy**2 > MAX_CENTROID_SHIFT**2:
+            logger.info(' *** Centroid shifted by %f,%f in ngmix.  Mask this one.',dx,dy)
+            flag |= CENTROID_SHIFT
+            print(' *** Centroid shifted by %f,%f in ngmix.  Mask this one.',dx,dy)
 
-    g1, g2, T = gmix.get_g1g2T()
-    if abs(g1) > 0.5 or abs(g2) > 0.5:
-        logger.info(' *** Bad shape measurement (%f,%f).  Mask this one.',g1,g2)
-        flag |= BAD_MEASUREMENT
+        g1, g2, T = gmix.get_g1g2T()
+        if abs(g1) > 0.5 or abs(g2) > 0.5:
+            logger.info(' *** Bad shape measurement (%f,%f).  Mask this one.',g1,g2)
+            flag |= BAD_MEASUREMENT
 
-    flux = gmix.get_flux() / wcs.pixelArea()  # flux is in ADU.  Should ~ match sum of pixels
+        flux = gmix.get_flux() / wcs.pixelArea()  # flux is in ADU.  Should ~ match sum of pixels
     #logger.info('ngmix: %s %s %s %s %s %s %s',dx,dy,g1,g2,T,flux,flag)
     return dx, dy, g1, g2, T, flux, flag
-    
+
+#this line just duplicate of the end for testing the one function    
+#measure_star_shapes(df,im_f,noweight=False,wcs=wcs,use_ngmix=True, fwhm=FWHM,logger=logger)
 
 
-# In[6]:
+# In[37]:
 
 
-def hsm(im, wt, logger):m
+def hsm(im, wt, logger):
     #print('im stats: ',im.array.min(),im.array.max(),im.array.mean(),np.median(im.array))                        
     #print('wt = ',wt)                                                                                            
     #if wt:                                                                                                       
@@ -327,7 +337,7 @@ def hsm(im, wt, logger):m
     return dx, dy, g1, g2, T, flux, flag
 
 
-# In[50]:
+# In[62]:
 
 
 #"Measure shapes of the raw stellar images at each location.      
@@ -396,8 +406,10 @@ def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, fwhm, logger):
             wt = full_weight[b]
             
         if use_ngmix:
-            #print("using ngmix")
-            dx, dy, e1, e2, T, flux, flag = ngmix_fit(im, wt, fwhm, x, y, logger)
+            print("using ngmix")
+            print(df['FLAGS_PSF'][i])
+            dx, dy, e1, e2, T, flux, flag = ngmix_fit(im, wt, fwhm, x, y, logger,df['FLAGS_PSF'][i])
+            
         else:
             dx, dy, e1, e2, T, flux, flag = hsm(im, wt, logger)
             
@@ -414,7 +426,7 @@ def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, fwhm, logger):
             df.loc[i, 'obs_e2'] = e2
             df.loc[i, 'obs_T'] = T
             df.loc[i, 'obs_flux'] = flux
-        df.loc[i, 'obs_flag'] |= flag
+            df.loc[i, 'obs_flag'] |= flag
     logger.info('final obs_flag = %s',df['obs_flag'][ind].values)
     #print('df[ind] = ',df.loc[ind].describe())                                                                          
     #flag_outliers(df, ind, 'obs', 4., logger) # This needs to be ported...                                              
@@ -423,7 +435,7 @@ def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, fwhm, logger):
     df.loc[df['obs_flag']!=0, 'use'] = False
 
 
-# In[51]:
+# In[31]:
 
 
 def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, use_ngmix, fwhm, logger):
@@ -514,7 +526,7 @@ def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, use_ngmix, f
     #flag_outliers(df, ind, 'psfex', 4., logger)                    
 
 
-# In[9]:
+# In[ ]:
 
 
 #not working
@@ -532,7 +544,7 @@ def wget( url, file):
     return full_file
 
 
-# In[53]:
+# In[48]:
 
 
 #want psf vs mag- brighter vs fatter
@@ -570,8 +582,9 @@ def bin_by_mag(m, dT, dTfrac, min_mused, band):
     ax.plot([min_mag,max_mag], [0,0], color='black')
     ax.plot([min_mused,min_mused],[-1,1], color='Grey')
     #ax.fill( [min_mag,min_mag,min_mused,min_mused], [-1,1,1,-1], fill=True, color='Grey',alpha=0.3)
+    ax.fill( [18.3,18.3,max_mag,max_mag], [0.003,-0.001,-0.001,0.003], fill=True, color='grey',alpha=0.3)
     t_line = ax.errorbar(mag_bins[:-1], bin_dT, yerr=bin_dT_err, color='darkturquoise', fmt='o')
-    ax.axhline(y=0.003, linewidth=4, color='grey')
+    #ax.axhline(y=0.003, linewidth=4, color='grey')
     #ax.legend([t_line], [r'$\delta T$'])
     ax.set_ylabel(r'$(T_{\rm PSF} - T_{\rm model}) \quad({\rm arcsec}^2)$', fontsize='x-large')
 
@@ -594,10 +607,10 @@ def bin_by_mag(m, dT, dTfrac, min_mused, band):
     plt.show()
 
 
-# In[55]:
+# In[85]:
 
 
-# Change locations to yours      
+# Change locations    
 cdir = '/global/cscratch1/sd/aamon/DEEP/UVista'
 cdir2= '/global/cscratch1/sd/amichoi/UltraVISTA'                                            
 
@@ -607,12 +620,19 @@ bands=["J" ]#, "H", "Ks", "Y"]
 for band in bands:
     print(band)
     
-    pf = '%s/psf/UVISTA_%s_21_01_16_psfcat.psf' % (cdir2, band) # PSFEx image
-    sf= '%s/psf/UVISTA_%s_21_01_16_psfex-starlist.fits' % (cdir2, band) #list of stars made from Sextractor and PSFEx
-    cf = '%s/cat/UVISTA_%s_21_01_16_psfcat.fits' % (cdir2, band) #the output from extractor 
+    pf = '%s/psf_042619/UVISTA_%s_21_01_16_psfcat.psf' % (cdir2, band) # PSFEx image
+    sf= '%s/psf_042619/UVISTA_%s_21_01_16_psfex-starlist.fits' % (cdir2, band) #list of stars made from Sextractor and PSFEx
+    cf = '%s/cat_042619/UVISTA_%s_21_01_16_psfcat.fits' % (cdir2, band) #the output from extractor 
     im_f = '%s/UVISTA_%s_21_01_16_allpaw_skysub_015_dr3_rc_v5.fits' % (cdir, band)  #VIDEO_H_10_34.31_-4.80.cleaned.fits
     wt_f = '%s/UVISTA_%s_21_01_16_allpaw_skysub_015_dr3_rc_v5.weight.fits'%(cdir, band)   
-
+    
+    #VIDEO
+    #cdir2= '/global/cscratch1/sd/amichoi/VIDEO'  
+    ##pf = '%s/psf/VIDEO_%s_6_52.80_-27.71_psfcat.psf' % (cdir2, band) # PSFEx image
+    #sf= '%s/psf/VIDEO_%s_6_52.80_-27.71_psfex-starlist.fits' % (cdir2, band) #list of stars made from Sextractor and PSFEx
+    #cf = '%s/cat/VIDEO_%s_6_52.80_-27.71_psfcat.fits' % (cdir2, band) #the output from extractor 
+    ##im_f = '%s/VIDEO_%s_6_52.80_-27.71.cleaned.fits' % (cdir2, band)  #VIDEO_H_10_34.31_-4.80.cleaned.fits
+    ##wt_f = '%s/VIDEO_%s_6_52.80_-27.71.weight.fits.gz'%(cdir2, band) 
     #get wcs and fwhm from image file
     full_image = galsim.fits.read(im_f, hdu=0)
     wcs = full_image.wcs
@@ -631,16 +651,20 @@ for band in bands:
     # Measure the hsm shapes on the stars in the actual image                                                                
     measure_star_shapes(
         df,im_f,noweight=False,wcs=wcs,use_ngmix=True, fwhm=FWHM,logger=logger)
-    # Measure                                                                                                                
+    # Measure      
+    print(list(df))
     measure_psfex_shapes(
         df,pf,im_f,noweight=False,wcs=wcs,use_ngmix=True, fwhm=FWHM, logger=logger)
 
     print(list(df))
+    
+    df = df[df.FLAGS_PSF == 0]
     from astropy.table import Table
     t = Table.from_pandas(df)
-    name='PSFres_UVISTA_%s.fits' % (band)
-    t.write(name, overwrite=True)  
     print(t)
+    #name='PSFres_UVISTA_%s.fits' % (band)
+    #t.write(name, overwrite=True)  
+    ##print(t)
     
     ####################################################
     #CUTS

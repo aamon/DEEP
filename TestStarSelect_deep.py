@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[12]:
+# In[38]:
 
 
 # Make a catalogue with real and model PSFs + magnitude etc, for PSF testing script
@@ -88,13 +88,13 @@ import pandas
 """
 
 
-# In[36]:
+# In[41]:
 
 
 def read_files(filter):
     
     #sex_file="/global/cscratch1/sd/amichoi/UltraVISTA/cat/UVISTA_%s_21_01_16_psfcat.fits" % (filter)   
-    sex_file="/global/cscratch1/sd/amichoi/VIDEO/cat/VIDEO_%s_10_36.80_-5.01_psfcat.fits" % (filter) 
+    sex_file="/global/cscratch1/sd/amichoi/VIDEO/cat/VIDEO_%s_6_52.80_-27.71_psfcat.fits" % (filter) 
         
     dat = fits.open(sex_file)
     cols = dat[2].columns
@@ -104,7 +104,7 @@ def read_files(filter):
 
     #read in list of stars made from Sextractor and PSFEx
     #star_file="/global/homes/a/aamon/DES/DEStests/DEEP/deeppsfs/UltraVista/UVISTA_%s_21_01_16_psfex-starlist.fits" % (filter)
-    star_file="/global/cscratch1/sd/amichoi/VIDEO/psf/VIDEO_%s_10_36.80_-5.01_psfex-starlist.fits" % (filter)
+    star_file="/global/cscratch1/sd/amichoi/VIDEO/psf/VIDEO_%s_6_52.80_-27.71_psfex-starlist.fits" % (filter)
 
     dat = fits.open(star_file)
     cols = dat[2].columns
@@ -152,7 +152,7 @@ plt.ylim(10,10**7 )
 plt.legend(stardf['FLAGS_PSF'])"""
 
 
-# In[37]:
+# In[42]:
 
 
 filter=['H', 'J', 'Ks']#, 'Y']
@@ -216,9 +216,9 @@ for i in range(numfilts):
     axs3[i].set_xlabel('MAG_APER')
     axs3[i].set_title(filt)
 
-fig.savefig("Figs/VIDEO_SNR_psffwhm.pdf")    
-fig2.savefig("Figs/VIDEO_SN_size.pdf")       
-fig3.savefig("Figs/VIDEO_size_mag.pdf")
+#fig.savefig("Figs/VIDEO_SNR_psffwhm.pdf")    
+#fig2.savefig("Figs/VIDEO_SN_size.pdf")       
+#fig3.savefig("Figs/VIDEO_size_mag.pdf")
 
 
 # In[ ]:
