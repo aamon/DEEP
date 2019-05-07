@@ -1,7 +1,7 @@
-1;95;0c#!/usr/bin/env python
+#!/usr/bin/env python
 # coding: utf-8
 
-# In[71]:
+# In[ ]:
 
 
 #! /usr/bin/env python                                                                                            
@@ -41,7 +41,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 
-# In[6]:
+# In[2]:
 
 
 # Don't skip columns in describe output  (default is 20, which is a bit too small)                                
@@ -76,17 +76,16 @@ BLACK_FLAG_FACTOR = 512 # blacklist flags are this times the original exposure b
 # be important)     
 
 
-# In[84]:
+# In[31]:
 
 
 #put the stars data into a dataframe 
 
-def read_psfex_stars(star_file, cat_file, magzp, logger): #combination of read findstars and read_image_header in MJ script
+def read_psfex_stars(star_file, cat_file, logger): #combination of read findstars and read_image_header in MJ script
     """Read the PSFEx star selection                                                                              
     """
     if not os.path.exists(star_file):
         return None
-    print("here")
     #dat = fits.open(star_file)
     #print(dat[2].columns)
     #dat = fits.open(cat_file)
@@ -104,7 +103,7 @@ def read_psfex_stars(star_file, cat_file, magzp, logger): #combination of read f
 
     ntot = len(df)
     nstars = df['FLAGS_PSF'].sum()
-    print('   found %d stars',ntot,nstars)
+    #print('   found %d stars',ntot,nstars)
     logger.info('   found %d stars',nstars)
     #is_star = df['FLAGS_PSF'] == 1
     #print
@@ -113,32 +112,34 @@ def read_psfex_stars(star_file, cat_file, magzp, logger): #combination of read f
     # Add on some extra information from the sextractor catalog                                                   
     sdata = fitsio.read(cat_file, 2)
     #print(data['X_IMAGE'])
-    print(sdata['X_IMAGE'])
+    #print(sdata['X_IMAGE'])
     assert len(data) == len(sdata)
     #print("magaper")
     #print(sdata['MAG_APER'])
     #print(sdata['MAG_APER'].shape)
-    df['mag_aper'] = sdata['MAG_APER'][:,0]
+    df['mag_aper'] = sdata['MAG_APER'][:,8]
     df['flux_radius'] = sdata['FLUX_RADIUS']
 
-    #df = df[df.FLAGS_PSF == 0] #ideally we want this line to measure the shapes of only the good stars, but it makes the code crash TBD figure out why
-    print('   found %d good stars', len(df))
-    print('   found %d good stars', len(df))
-    plt.scatter(sdata['MAG_APER'][:,0], sdata['FLUX_RADIUS'],c='blue',label='FLAGS_PSF==0', marker='.',s=4) # , colormap='viridis')
-    plt.scatter(df['mag_aper'], df['flux_radius'], c='red',label='FLAGS_PSF==0', marker='.',s=4) # , colormap='viridis')
+    #df = df[df.FLAGS_PSF == 0] #this line doesn't work!!!!!!!
+    #print('   found %d good stars', len(df))
+    plt.scatter(sdata['MAG_APER'][:,8], sdata['FLUX_RADIUS'],c='blue',label='FLAGS_PSF!=0 : %d' % (len(sdata['FLUX_RADIUS'])), marker='.',s=4) # , colormap='viridis')
+    plt.scatter(sdata['MAG_APER'][np.where(data['FLAGS_PSF'] == 0),8], sdata['FLUX_RADIUS'][np.where(data['FLAGS_PSF'] == 0)],c='red',label='FLAGS_PSF==0 :%d' % (len(sdata['FLUX_RADIUS'][np.where(data['FLAGS_PSF'] == 0)])), marker='.',s=4) # , colormap='viridis')
+    #plt.scatter(df['mag_aper'], df['flux_radius'], c='red',label='FLAGS_PSF==0', marker='.',s=4) # , colormap='viridis')
     plt.xlim((10,28))
     plt.ylim(0,10)
     #axs2[i].legend(sexstar['FLAGS_PSF'])
     plt.ylabel('FLUX_RADIUS')
-    plt.xlabel('MAG_APER')
+    plt.xlabel('MAG_APER[:,8]')
+    plt.title('%s'% band)
+    plt.legend()
     plt.show()
 
     return df
 
 
-# In[ ]:
+# In[4]:
 
-"""
+
 #this is just a dublicate from the end in order to test why my mag_apers for "good" galaxies were higher than expected
 
 # Change locations to yours      
@@ -167,15 +168,16 @@ for band in bands:
     #print(h)
     fwhm = h['PSF_FWHM']
     
-    magzp = 30.0                                                                  
+    magzp = 30.0     
+    mmlogging_level = logging.INFO
+    logger = logging.getLogger('size_residual')
     df = read_psfex_stars(sf, cf, magzp, logger)
-"""
 
-# In[82]:
+
+# In[5]:
 
 
 def make_ngmix_prior(T, pixel_scale):
-    
     # centroid is 1 pixel gaussian in each direction
     cen_prior=priors.CenPrior(0.0, 0.0, pixel_scale, pixel_scale)
 
@@ -192,16 +194,14 @@ def make_ngmix_prior(T, pixel_scale):
     return prior
 
 
-def ngmix_fit(im, wt, fwhm, x, y, logger, psfflag):
-    
-        
+def ngmix_fit(im, wt, fwhm, x, y, logger, psfflag):     
     flag = 0
     dx, dy, g1, g2, flux = 0., 0., 0., 0., 0.
     T_guess = (fwhm / 2.35482)**2 * 2.
     T = T_guess
     #print('fwhm = %s, T_guess = %s'%(fwhm, T_guess))
     if psfflag==0:
-        try:
+        
             #hsm_dx,hsm_dy,hsm_g1,hsm_g2,hsm_T,hsm_flux,hsm_flag = hsm(im, None, logger)
             #logger.info('hsm: %s, %s, %s, %s, %s, %s, %s',hsm_dx,hsm_dy,hsm_g1,hsm_g2,hsm_T,hsm_flux,hsm_flag)
             #if hsm_flag != 0:
@@ -211,17 +211,18 @@ def ngmix_fit(im, wt, fwhm, x, y, logger, psfflag):
             #elif np.abs(np.log(T/T_guess)) > 0.5:
                 #print('hsm: ',g1,g2,T,flux,hsm_flag)
                 #print('T = %s is not near T_guess = %s.  Reverting to T_guess'%(T,T_guess))
-                #T = T_guess
-
-            print(im.wcs.local)
-            print(im.center)
-            print("this line ", im.wcs.local(im.center))
-            wcs = im.wcs.local(im.center)
-            print(wcs)
-
-            print("going to make prior", T,wcs.minLinearScale())
+            #T = T_guess
+        #print("before wcs.local")
+        #print(im.wcs.local)
+        #print("before im.center")
+        #print(im.true_center)
+        #print("this line ", im.wcs.local(im.true_center))
+        wcs = im.wcs.local(im.true_center)
+        #print(wcs)
+        try:
+            #print("going to make prior", T,wcs.minLinearScale())
             prior = make_ngmix_prior(T, wcs.minLinearScale())
-            print("prior", prior)
+            #print("prior", prior)
 
             if galsim.__version__ >= '1.5.1':
                 cen = im.true_center - im.origin
@@ -265,12 +266,11 @@ def ngmix_fit(im, wt, fwhm, x, y, logger, psfflag):
         flux = gmix.get_flux() / wcs.pixelArea()  # flux is in ADU.  Should ~ match sum of pixels
     #logger.info('ngmix: %s %s %s %s %s %s %s',dx,dy,g1,g2,T,flux,flag)
     return dx, dy, g1, g2, T, flux, flag
-
-#this line just duplicate of the end for testing the one function    
+    
 #measure_star_shapes(df,im_f,noweight=False,wcs=wcs,use_ngmix=True, fwhm=FWHM,logger=logger)
 
 
-# In[37]:
+# In[87]:
 
 
 def hsm(im, wt, logger):
@@ -337,11 +337,11 @@ def hsm(im, wt, logger):
     return dx, dy, g1, g2, T, flux, flag
 
 
-# In[62]:
+# In[88]:
 
 
 #"Measure shapes of the raw stellar images at each location.      
-def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, fwhm, logger):
+def measure_star_shapes(df, image_file, weight_file,noweight, wcs, use_ngmix, fwhm, logger):
     logger.info('Read in stars in file: %s',image_file)
 
     ind = df.index[df['FLAGS_PSF'] == 0]
@@ -375,8 +375,8 @@ def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, fwhm, logger):
     
     #print(xall,yall)
     world = w.wcs_pix2world(xall,yall,1)
-    print(world)
-    print(world[0])
+    #print(world)
+    #print(world[0])
     df['ra'] = world[0]
     df['dec'] = world[1]
  
@@ -384,6 +384,7 @@ def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, fwhm, logger):
         full_image.wcs = wcs
 
     if not noweight:
+        print("want weights! ", weight_file)
         weight_file = image_file.replace(".fits", ".weight.fits")
         full_weight = galsim.fits.read(weight_file, hdu=0)
         full_weight.array[full_weight.array < 0] = 0.
@@ -406,8 +407,8 @@ def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, fwhm, logger):
             wt = full_weight[b]
             
         if use_ngmix:
-            print("using ngmix")
-            print(df['FLAGS_PSF'][i])
+            #print("using ngmix")
+            #print(df['FLAGS_PSF'][i])
             dx, dy, e1, e2, T, flux, flag = ngmix_fit(im, wt, fwhm, x, y, logger,df['FLAGS_PSF'][i])
             
         else:
@@ -435,10 +436,10 @@ def measure_star_shapes(df, image_file, noweight, wcs, use_ngmix, fwhm, logger):
     df.loc[df['obs_flag']!=0, 'use'] = False
 
 
-# In[31]:
+# In[89]:
 
 
-def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, use_ngmix, fwhm, logger):
+def measure_psfex_shapes(df, psfex_file, image_file, weight_file, noweight, wcs, use_ngmix, fwhm, logger):
     """Measure shapes of the PSFEx solution at each location.                                                            
     """
     logger.info('Read in PSFEx file: %s',psfex_file)
@@ -474,9 +475,12 @@ def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, use_ngmix, f
         full_image.wcs = wcs
 
     if not noweight:
+        print("want weights! ", weight_file)
         weight_file = image_file.replace(".fits", ".weight.fits")
         full_weight = galsim.fits.read(weight_file, hdu=0)
         full_weight.array[full_weight.array < 0] = 0.
+    
+    
 
     stamp_size = 48
 
@@ -504,7 +508,7 @@ def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, use_ngmix, f
             im.addNoise(galsim.VariableGaussianNoise(rng, var))
             
         if use_ngmix:
-            dx, dy, e1, e2, T, flux, flag = ngmix_fit(im, wt, fwhm, x, y, logger)
+            dx, dy, e1, e2, T, flux, flag = ngmix_fit(im, wt, fwhm, x, y, logger, df['FLAGS_PSF'][i])
         else:
             dx, dy, e1, e2, T, flux, flag = hsm(im, wt, logger)
 
@@ -520,13 +524,13 @@ def measure_psfex_shapes(df, psfex_file, image_file, noweight, wcs, use_ngmix, f
             df.loc[i, 'psfex_T'] = T
             df.loc[i, 'psfex_flux'] = flux
         df.loc[i, 'psfex_flag'] |= flag
-    print('final psfex_flag = %s',df['psfex_flag'][ind].values)
+    #print('final psfex_flag = %s',df['psfex_flag'][ind].values)
     logger.info('final psfex_flag = %s',df['psfex_flag'][ind].values)
     #print('df[ind] = ',df.loc[ind].describe())                                                                          
     #flag_outliers(df, ind, 'psfex', 4., logger)                    
 
 
-# In[ ]:
+# In[9]:
 
 
 #not working
@@ -544,7 +548,7 @@ def wget( url, file):
     return full_file
 
 
-# In[48]:
+# In[81]:
 
 
 #want psf vs mag- brighter vs fatter
@@ -553,18 +557,19 @@ def bin_by_mag(m, dT, dTfrac, min_mused, band):
     max_mag = max(m) #21
     print("min and max mag: ", min_mag, max_mag)
      
-    mag_bins = np.linspace(min_mag,max_mag,71)
-    #print('mag_bins = ',mag_bins)
+    mag_bins = np.linspace(min_mag,max_mag,31)
+    print('mag_bins = ',mag_bins)
     index = np.digitize(m, mag_bins)
     #print('len(index) = ',len(index))
 
     bin_dT = [dT[index == i].mean() for i in range(1, len(mag_bins))]
-    #print('bin_dT = ',bin_dT)
+    print('bin_dT = ',bin_dT)
     bin_dTfrac = [dTfrac[index == i].mean() for i in range(1, len(mag_bins))]
-    #print('bin_dTfrac = ',bin_dTfrac)
-    bin_dT_err = [ np.sqrt(dT[index == i].var() / len(dT[index == i]))
-                    for i in range(1, len(mag_bins)) ]
-    #print('bin_dT_err = ',bin_dT_err)
+    #for i in range(1, len(mag_bins)):
+        #print(len(dT[index == i]))
+    bin_dT_err = [ np.sqrt(dT[index == i].var() / len(dT[index == i])) for i in range(1, len(mag_bins)) ]
+    #print('dTfrac = ',len(dTfrac[index == i]))
+    
     bin_dTfrac_err = [ np.sqrt(dTfrac[index == i].var() / len(dTfrac[index == i]))
                     for i in range(1, len(mag_bins)) ]
     #print('bin_dTfrac_err = ',bin_dTfrac_err)
@@ -578,7 +583,7 @@ def bin_by_mag(m, dT, dTfrac, min_mused, band):
     fig, axes = plt.subplots(2,1, sharex=True)
     
     ax = axes[0]
-    ax.set_ylim(-0.02,0.02)
+    #ax.set_ylim(-0.02,0.02)
     ax.plot([min_mag,max_mag], [0,0], color='black')
     ax.plot([min_mused,min_mused],[-1,1], color='Grey')
     #ax.fill( [min_mag,min_mag,min_mused,min_mused], [-1,1,1,-1], fill=True, color='Grey',alpha=0.3)
@@ -589,7 +594,7 @@ def bin_by_mag(m, dT, dTfrac, min_mused, band):
     ax.set_ylabel(r'$(T_{\rm PSF} - T_{\rm model}) \quad({\rm arcsec}^2)$', fontsize='x-large')
 
     ax = axes[1]
-    ax.set_ylim(-0.05,0.05)
+    #ax.set_ylim(-0.05,0.05)
     ax.plot([min_mag,max_mag], [0,0], color='black')
     ax.plot([min_mused,min_mused],[-1,1], color='Grey')
     #ax.fill( [min_mag,min_mag,min_mused,min_mused], [-1,1,1,-1], fill=True, color='Grey',alpha=0.3)
@@ -607,7 +612,7 @@ def bin_by_mag(m, dT, dTfrac, min_mused, band):
     plt.show()
 
 
-# In[85]:
+# In[91]:
 
 
 # Change locations    
@@ -620,59 +625,66 @@ bands=["J" ]#, "H", "Ks", "Y"]
 for band in bands:
     print(band)
     
-    pf = '%s/psf_042619/UVISTA_%s_21_01_16_psfcat.psf' % (cdir2, band) # PSFEx image
-    sf= '%s/psf_042619/UVISTA_%s_21_01_16_psfex-starlist.fits' % (cdir2, band) #list of stars made from Sextractor and PSFEx
-    cf = '%s/cat_042619/UVISTA_%s_21_01_16_psfcat.fits' % (cdir2, band) #the output from extractor 
+    pf = '%s/psf/UVISTA_%s_21_01_16_allpaw_skysub_015_dr3_rc_v5_psfcat.psf' % (cdir2, band) # PSFEx image
+    sf= '%s/psf/UVISTA_%s_21_01_16_allpaw_skysub_015_dr3_rc_v5_psfex-starlist.fits' % (cdir2, band) #list of stars made from Sextractor and PSFEx
+    cf = '%s/cat/UVISTA_%s_21_01_16_allpaw_skysub_015_dr3_rc_v5_psfcat.fits' % (cdir2, band) #the output from extractor 
     im_f = '%s/UVISTA_%s_21_01_16_allpaw_skysub_015_dr3_rc_v5.fits' % (cdir, band)  #VIDEO_H_10_34.31_-4.80.cleaned.fits
-    wt_f = '%s/UVISTA_%s_21_01_16_allpaw_skysub_015_dr3_rc_v5.weight.fits'%(cdir, band)   
+    wt_f = '%s/UVISTA_%s_21_01_16_allpaw_skysub_015_dr3_rc_v5.weight.fits'%(cdir, band) 
+    #dat = fits.open(sf)
+    #print(dat[2].columns)
     
     #VIDEO
-    #cdir2= '/global/cscratch1/sd/amichoi/VIDEO'  
-    ##pf = '%s/psf/VIDEO_%s_6_52.80_-27.71_psfcat.psf' % (cdir2, band) # PSFEx image
-    #sf= '%s/psf/VIDEO_%s_6_52.80_-27.71_psfex-starlist.fits' % (cdir2, band) #list of stars made from Sextractor and PSFEx
-    #cf = '%s/cat/VIDEO_%s_6_52.80_-27.71_psfcat.fits' % (cdir2, band) #the output from extractor 
-    ##im_f = '%s/VIDEO_%s_6_52.80_-27.71.cleaned.fits' % (cdir2, band)  #VIDEO_H_10_34.31_-4.80.cleaned.fits
-    ##wt_f = '%s/VIDEO_%s_6_52.80_-27.71.weight.fits.gz'%(cdir2, band) 
+    """
+    cdir= '/global/cscratch1/sd/amichoi/VIDEO' 
+    cdir2= '/global/cscratch1/sd/amichoi/VIDEO/CDFS'  
+    pf = '%s/psf/VIDEO_%s_6_52.80_-27.71_psfcat.psf' % (cdir2, band) # PSFEx image
+    sf= '%s/psf/VIDEO_%s_6_52.80_-27.71_psfex-starlist.fits' % (cdir2, band) #list of stars made from Sextractor and PSFEx
+    cf = '%s/cat/VIDEO_%s_6_52.80_-27.71_psfcat.fits' % (cdir2, band) #the output from extractor 
+    im_f = '%s/VIDEO_%s_6_52.80_-27.71.cleaned.fits' % (cdir, band)  #VIDEO_H_10_34.31_-4.80.cleaned.fits
+    wt_f = '%s/VIDEO_%s_6_52.80_-27.71.weight.fits'%(cdir, band) 
     #get wcs and fwhm from image file
     full_image = galsim.fits.read(im_f, hdu=0)
+    dat = fitsio.read(sf, ext=2)
+    FWHM = dat['FWHM_PSF'] #video doesn't have fwhm in image header! 
+    """
     wcs = full_image.wcs
     f = fitsio.FITS(im_f)
     hdu=0
     header_list = f[hdu].read_header_list()
     header_list = [ d for d in header_list if 'CONTINUE' not in d['name'] ]
     h = fitsio.FITSHDR(header_list)
-    FWHM = h['PSF_FWHM']
+    #print(h)
+    FWHM = h['PSF_FWHM'] #video doesn't have fwhm in image header! 
+
 
     magzp = 30.0
     mmlogging_level = logging.INFO
     logger = logging.getLogger('size_residual')
     # Read in some useful values, such as position                                                                           
-    df = read_psfex_stars(sf, cf, magzp, logger)
+    df = read_psfex_stars(sf, cf, logger)
     # Measure the hsm shapes on the stars in the actual image                                                                
     measure_star_shapes(
-        df,im_f,noweight=False,wcs=wcs,use_ngmix=True, fwhm=FWHM,logger=logger)
+        df,im_f,wt_f, noweight=False,wcs=wcs,use_ngmix=False, fwhm=FWHM,logger=logger)
     # Measure      
-    print(list(df))
+    #print(list(df))
     measure_psfex_shapes(
-        df,pf,im_f,noweight=False,wcs=wcs,use_ngmix=True, fwhm=FWHM, logger=logger)
+        df,pf,im_f, wt_f,noweight=False,wcs=wcs,use_ngmix=False, fwhm=FWHM, logger=logger)
 
     print(list(df))
-    
+    print("All objs: ", len(df))
     df = df[df.FLAGS_PSF == 0]
     from astropy.table import Table
     t = Table.from_pandas(df)
     print(t)
-    #name='PSFres_UVISTA_%s.fits' % (band)
-    #t.write(name, overwrite=True)  
-    ##print(t)
+    name='PSFres_VIDEO_%s_ngmix.fits' % (band)
+    t.write(name, overwrite=True, format='ascii')  
+    #print(t)
     
     ####################################################
     #CUTS
-    print("All objs: ", len(df))
     good = (df['psfex_T'].values!=-999)&(df['obs_T'].values!=-999)
     df=df[good]
     print("Good objs: ", len(df))
-    print(list(df))
     ####################################################
     #PLOT
     def compute_res(d):
@@ -688,6 +700,7 @@ for band in bands:
     plt.hist(sizeres, 30)
     plt.xlabel('T_res = PSF - obs', fontsize='x-large')
     plt.ylabel('Num good objects',fontsize='x-large')
+    plt.title('%s'% band)
     #plt.savefig('UltraVISTA_J_resid.png',bbox_inches='tight')
     plt.figure(figsize=(12,12))
     plt.show()
@@ -713,7 +726,7 @@ Currently no functions to:
 """
 
 
-# In[ ]:
+# In[12]:
 
 
 # Starfile has the following columns:
@@ -748,7 +761,7 @@ Currently no functions to:
   # name = 'ERRTHETAWIN_J2000'; format = '1E'; unit = 'deg'; disp = 'F6.2'
 
 
-# In[ ]:
+# In[13]:
 
 
 # Now plot some results:                                                                                                 
