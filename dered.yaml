@@ -1,0 +1,44 @@
+# For dereddening the photometry of a deep-field catalogue. A gold catalogue (or equivalent) covering the same region is needed for the E(B-V) values. 
+# Both cats need RA, Dec for position matching.
+
+# Catalogues are assumed to be in fits format
+#deep_cat: 'run-fmof-dv02.fits'
+#gold_cat: 'cosmos_9band_mof_ebv.fits'
+
+deep_cat: '/global/project/projectdirs/des/y3-image-sims/run-fmof-dv02.fits'
+# '/global/cscratch1/sd/aamon/DEEP/MOFcats/run-sn-ugriz-mof01-C3-X3.fits'
+#'/global/cscratch1/sd/aamon/DEEP/MOFcats/run-dessn-mof01_griz_e2_collated.fits'
+#/global/cscratch1/sd/aamon/DEEP/MOFcats/run-dmask09_replace_desmofmask_uvd02_cosmos_collated.fits' #
+gold_cat: 'DES_Y3_GOLD_C3X3E2Cosmos_SFD.fits' #DES_Y3_GOLD_C3X3_SFD.fits'  #'DES_Y3_GOLD_X3_SFD.fits'  #'DES_Y3_GOLD_C3_SFD.fits' # 'cosmos_ebv.fits' DES_Y3_GOLD_E2_SFD.fits
+
+# coord cols [deep_ra, deep_dec, gold_ra, gold_dec]
+coords: ['ra', 'dec', 'ALPHAWIN_J2000', 'DELTAWIN_J2000'] #
+
+# The bands present in the deep cat. This must be in indexing order of the
+# fits array containing the photometry
+# (This actually isn't needed in the expected catalogue format)
+#bands: ['u','g','r','i','z','J','H','Ks'] 
+#bands: ['u','g','r','i','z', 'Y', 'J','H','Ks'] 
+#bands: ['g','r','i','z']
+bands: ['u','g','r','i','z']
+#bands: ['J','H','Ks']
+
+# Column names for the photometry in the deep file.
+flux_col:  'bdf_flux'
+flux_err_col: 'bdf_flux_err'
+mag_col: 'bdf_mag'
+
+# Extinction cloumn name - this is E(B-V) with R_v=3.1
+Ext_col: 'EBV_SFD98'
+
+# extinction coeffs for R_V = 3.1 dust law
+# These must match the order of the bands above
+#coeffs: [3.9627, 3.186, 2.140, 1.569, 1.196,  0.705, 0.441, 0.308]  #removed Y 1.017,
+#coeffs: [3.9627, 3.186, 2.140, 1.569, 1.196,1.017,  0.705, 0.441, 0.308] 
+#coeffs: [3.186, 2.140, 1.569, 1.196]
+coeffs: [3.9627,3.186, 2.140, 1.569, 1.196]  #ugriz
+#coeffs: [0.705, 0.441, 0.308] #jhk
+
+
+# ugriz are from https://cdcvs.fnal.gov/redmine/projects/des-y3/wiki/Y3A2_Gold_Interstellar_Extinction#Version-20-20180112
+# YJHKs are from Gonzalez-Fernandez et al. 2018, 1711.08805, (http://adsabs.harvard.edu/abs/2018MNRAS.474.5459G).
