@@ -18,9 +18,9 @@ coords: ['ra', 'dec', 'ALPHAWIN_J2000', 'DELTAWIN_J2000'] #
 # fits array containing the photometry
 # (This actually isn't needed in the expected catalogue format)
 #bands: ['u','g','r','i','z','J','H','Ks'] 
-#bands: ['u','g','r','i','z', 'Y', 'J','H','Ks'] 
+bands: ['u','g','r','i','z', 'Y', 'J','H','Ks'] 
 #bands: ['g','r','i','z']
-bands: ['u','g','r','i','z']
+#bands: ['u','g','r','i','z']
 #bands: ['J','H','Ks']
 
 # Column names for the photometry in the deep file.
@@ -34,9 +34,9 @@ Ext_col: 'EBV_SFD98'
 # extinction coeffs for R_V = 3.1 dust law
 # These must match the order of the bands above
 #coeffs: [3.9627, 3.186, 2.140, 1.569, 1.196,  0.705, 0.441, 0.308]  #removed Y 1.017,
-#coeffs: [3.9627, 3.186, 2.140, 1.569, 1.196,1.017,  0.705, 0.441, 0.308] 
+coeffs: [3.9627, 3.186, 2.140, 1.569, 1.196,1.017,  0.705, 0.441, 0.308] 
 #coeffs: [3.186, 2.140, 1.569, 1.196]
-coeffs: [3.9627,3.186, 2.140, 1.569, 1.196]  #ugriz
+#coeffs: [3.9627,3.186, 2.140, 1.569, 1.196]  #ugriz
 #coeffs: [0.705, 0.441, 0.308] #jhk
 
 
