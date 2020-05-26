@@ -1,0 +1,58 @@
+#Yaml to apply the zero-point calibrations, and prep columns for the DB
+make_db_file: False
+
+# Catalogues are assumed to be in fits format
+opt_cat: 'run-ugriz-mof02_extcorr_24Apr20.fits'
+nir_cat: 'run-JHK-mof02_ff04_ff02_extcorr_24Apr20.fits'
+
+# The bands present in the deep cat. This must be in indexing order of the
+# fits array containing the photometry
+bands_opt: ['u','g','r','i','z']
+bands_nir: ['J','H','Ks']
+
+# Column names for the base photometry in the deep file.
+# lists of flux columns, fluxerr columns and magnitude columns to correct.
+# zero-point shifts don't require changes in mag errors.
+# We do only the most obvious cases, to keep the number of columns down.
+# Others (such as gap_flux) can be easily constructed from ratios of the
+# original columns to the corrected ones.
+flux_cols: ['psf_flux', 'bdf_flux', 'bdf_flux_dered']
+flux_err_cols: ['psf_flux_err', 'bdf_flux_err', 'bdf_flux_err_dered']
+mag_cols: ['psf_mag', 'bdf_mag', 'bdf_mag_dered']
+
+# the label to add to the column names
+col_ext: '_calib'
+
+# the label to add to the filename
+fname_ext: '_calib_19May20'
+
+# dictionary of adjustments - add these in the code.
+# These are applied as so:
+# mag_corrected = mag + adj
+# X3, C3, E2, COS
+colour_adj: {'u':[0.,0.,0.02,-0.03], 
+          'g':[0.,0.,0.,0.], 
+          'r':[0.,-0.01,0.,0.], 
+          'i':[0.,0.005,0.,0.], 
+          'z':[0.,0.,0.,0.], 
+          'J':[0.,0.0152,-0.0088,-0.014], 
+          'H':[0.,0.0152,-0.0168,-0.004], 
+          'Ks':[0.,0.0152,-0.0168,-0.004]}
+
+gold_adj: {'u':[0.,0.,0.01432,0.], 
+          'g':[0.01066,0.01066,0.02498,0.01066], 
+          'r':[0.00565,0.00565,0.01997,0.00565], 
+          'i':[0.,0.,0.01432,0.], 
+          'z':[0.00435,0.00435,0.01867,0.00435], 
+          'J':[0.,0.,0.01432,0.], 
+          'H':[0.,0.,0.01432,0.], 
+          'Ks':[0.,0.,0.01432,0.]}
+
+# Columns for the database
+db_cols: ['id', 'ra', 'dec', 'fof_id', 'fof_size', 'mask_flags', 'flags', 'flagstr', 'badpix_frac', 'psf_g', 'psf_T', 'psf_flux_flags', 'bdf_T', 'bdf_T_err', 'bdf_T_ratio', 'bdf_g', 'bdf_fracdev', 'bdf_fracdev_err', 'tilename', 'EBV_SFD98']
+
+photom_cols: ['psf_flux', 'psf_flux_err', 'bdf_flux', 'bdf_flux_err', 'gap_flux', 'gap_flux_err', 'psf_flux_calib', 'psf_flux_err_calib', 'bdf_flux_calib', 'bdf_flux_err_calib', 'bdf_flux_dered', 'bdf_flux_err_dered', 'bdf_flux_dered_calib', 'bdf_flux_err_dered_calib', 'psf_mag', 'psf_mag_calib', 'bdf_mag', 'bdf_mag_dered', 'bdf_mag_err_dered', 'bdf_mag_dered_calib']
+
+nir_extra_cols: ['mask_flags', 'flags', 'flagstr', 'badpix_frac']
+
+nir_ext: '_nir'
